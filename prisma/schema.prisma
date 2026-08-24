@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Using SQLite for local development. 
+// User will switch this to 'postgresql' on the VPS.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        BigInt   @id // Telegram User ID
+  username  String?
+  balance   Float    @default(0)
+  role      String   @default("USER") // USER, ADMIN
+  transactions Transaction[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id        String   @id @default(uuid())
+  userId    BigInt
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // DEPOSIT, PURCHASE
+  amount    Float
+  currency  String   // INR, USDT
+  status    String   // PENDING, APPROVED, REJECTED
+  reference String?  // UTR or LZT Item ID
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
