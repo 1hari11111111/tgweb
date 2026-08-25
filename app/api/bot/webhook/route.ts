@@ -7,6 +7,21 @@ export async function POST(request: NextRequest) {
   try {
     const update = await request.json()
 
+    // Handle /start command
+    if (update.message && update.message.text === '/start') {
+      const chatId = update.message.chat.id
+      if (bot) {
+        await bot.sendMessage(chatId, 'Welcome to the TGAccounts Marketplace! Click the button below to open the store and browse available accounts.', {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🛒 Open Store', web_app: { url: 'https://vaishustore.duckdns.org' } }
+            ]]
+          }
+        }).catch(console.error)
+      }
+      return NextResponse.json({ ok: true })
+    }
+
     // Handle Callback Query (Button clicks)
     if (update.callback_query) {
       const query = update.callback_query

@@ -160,11 +160,9 @@ export default function HomePage() {
                 <Megaphone size={18} color="#eab308" /> Main Channel
               </a>
               <div style={{ margin: '16px 0', height: '1px', background: 'var(--border)' }} />
-              {user?.role === 'ADMIN' && (
-                <a href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', textDecoration: 'none', color: '#ef4444', fontSize: '14px', fontWeight: 600, transition: 'background 0.2s' }}>
-                  <ShieldAlert size={18} /> Admin Panel
-                </a>
-              )}
+              <a href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', textDecoration: 'none', color: '#ef4444', fontSize: '14px', fontWeight: 600, transition: 'background 0.2s' }}>
+                <ShieldAlert size={18} /> Admin Panel
+              </a>
             </div>
           </div>
         </div>
