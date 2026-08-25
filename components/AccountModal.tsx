@@ -163,17 +163,17 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
   return (
     <div className="modal-overlay" onClick={onClose} style={{
       position: 'fixed', inset: 0, background: 'rgba(15,20,25,0.85)', backdropFilter: 'blur(4px)',
-      zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
+      zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
     }}>
       <div className="fade-in" onClick={e => e.stopPropagation()} style={{
         background: 'var(--bg-card)', border: '1px solid var(--border)',
-        borderRadius: '8px', width: '100%', maxWidth: '500px', maxHeight: '90vh',
+        borderRadius: '24px', width: '100%', maxWidth: '420px', maxHeight: '90vh',
         boxShadow: '0 10px 40px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column'
       }}>
 
         {/* Header */}
         <div style={{
-          padding: '24px',
+          padding: '20px 24px',
           borderBottom: '1px solid var(--border)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
         }}>
@@ -290,10 +290,10 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
           {/* Buy Action Box */}
           <div style={{
             background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-            borderRadius: '8px', padding: '24px', textAlign: 'center', marginTop: '8px'
+            borderRadius: '16px', padding: '20px', textAlign: 'center', marginTop: '12px'
           }}>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 500 }}>Total Price</p>
-            <p style={{ fontSize: '22px', fontWeight: 600, color: 'var(--accent)', marginBottom: '20px' }}>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Total Price</p>
+            <p style={{ fontSize: '24px', fontWeight: 800, color: 'var(--accent)', marginBottom: '16px' }}>
               {formatPrice(account.price, inrExchangeRate)}
             </p>
             {purchaseSuccess ? (
@@ -301,8 +301,8 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
                 Purchase Successful! The session file has been sent to you via Telegram bot.
               </div>
             ) : showConfirm ? (
-              <div style={{ padding: '16px', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: '8px', textAlign: 'left' }}>
-                <p style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600, marginBottom: '12px' }}>Confirm Purchase?</p>
+              <div style={{ padding: '16px', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: '12px', textAlign: 'left' }}>
+                <p style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600, marginBottom: '8px' }}>Confirm Purchase?</p>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
                   ₹{(account.price * inrExchangeRate).toFixed(2)} will be deducted from your wallet balance.
                 </p>
@@ -310,14 +310,14 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
                   <button
                     onClick={confirmPurchase}
                     disabled={purchasing}
-                    style={{ flex: 1, padding: '10px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', gap: '6px' }}
+                    style={{ flex: 1, padding: '12px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', gap: '6px' }}
                   >
-                    {purchasing ? <Loader2 size={16} className="spinner" /> : 'Yes, Buy Now'}
+                    {purchasing ? <Loader2 size={16} className="spinner" /> : 'Buy Now'}
                   </button>
                   <button
                     onClick={() => setShowConfirm(false)}
                     disabled={purchasing}
-                    style={{ flex: 1, padding: '10px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
@@ -325,17 +325,20 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
               </div>
             ) : (
               <button
-                onClick={handlePurchase}
+                onClick={() => setShowConfirm(true)}
                 disabled={purchasing || !user || user.balance < account.price * inrExchangeRate}
                 style={{
+                  width: '100%', height: '52px',
+                  background: 'var(--accent)', color: '#fff', fontSize: '15px', fontWeight: 700,
+                  border: 'none', borderRadius: '16px', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  width: '100%', height: '48px', background: 'var(--accent)', color: '#fff',
-                  border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600,
-                  textTransform: 'uppercase', cursor: 'pointer', opacity: purchasing ? 0.7 : 1
+                  transition: 'transform 0.1s, opacity 0.2s', opacity: (purchasing || !user || user.balance < account.price * inrExchangeRate) ? 0.5 : 1
                 }}
+                onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
               >
                 {purchasing ? <Loader2 size={18} className="spinner" /> : <ShoppingCart size={18} />}
-                {purchasing ? 'Processing...' : 'Pay with Balance'}
+                {purchasing ? 'PROCESSING...' : 'PAY WITH BALANCE'}
               </button>
             )}
 

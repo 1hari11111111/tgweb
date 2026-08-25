@@ -23,6 +23,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <script src="https://telegram.org/js/telegram-web-app.js" async></script>
+      </head>
       <body className={`${geist.className} bg-[#0a0a0f] text-white min-h-screen antialiased`}>
         <TmaProvider>
           {children}

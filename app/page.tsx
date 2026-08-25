@@ -6,7 +6,7 @@ import ResultsSection from '@/components/ResultsSection'
 import WalletModal from '@/components/WalletModal'
 import { useTma } from '@/components/TmaProvider'
 import { TelegramAccount } from '@/lib/lzt'
-import { Wallet } from 'lucide-react'
+import { Wallet, Menu, X, MessageCircle, Megaphone, User, ShieldAlert } from 'lucide-react'
 
 interface SearchResult {
   items: TelegramAccount[]
@@ -26,6 +26,7 @@ export default function HomePage() {
   const [sortBy, setSortBy] = useState('pdate_to_down')
   const [hasFetched, setHasFetched] = useState(false)
   const [showWallet, setShowWallet] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(false)
   const { user } = useTma()
   const abortRef = useRef<AbortController | null>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
@@ -120,22 +121,54 @@ export default function HomePage() {
               onClick={() => setShowWallet(true)}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}
             >
-              <Wallet size={14} color="var(--accent)" /> Wallet
-              {user !== null && <span style={{ marginLeft: '4px', color: 'var(--text-secondary)' }}>₹ {user.balance.toFixed(2)}</span>}
+              <Wallet size={14} color="var(--accent)" /> Wallet{user !== null ? `: ₹ ${user.balance.toFixed(2)}` : ''}
             </button>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', marginRight: '4px' }} />
-              <a href="/admin" style={{ fontSize: '12px', color: 'var(--text-muted)', textDecoration: 'none', padding: '4px 10px', borderRadius: '5px', transition: 'color 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-              >
-                Admin
-              </a>
-            </div>
+            <button
+              onClick={() => setShowSidebar(true)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
+            >
+              <Menu size={20} />
+            </button>
+            
           </div>
         </div>
       </nav>
+
+      {/* ── Sidebar (Drawer) ── */}
+      {showSidebar && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={() => setShowSidebar(false)} />
+          <div style={{ position: 'relative', width: '280px', height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideLeft 0.2s ease-out' }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                  <User size={20} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '15px' }}>{user?.username || 'Guest'}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {user?.id || '---'}</div>
+                </div>
+              </div>
+              <button onClick={() => setShowSidebar(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px', flexGrow: 1 }}>
+              <a href="https://t.me/your_support_bot" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500, transition: 'background 0.2s' }}>
+                <MessageCircle size={18} color="var(--accent)" /> Support Chat
+              </a>
+              <a href="https://t.me/your_main_channel" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500, transition: 'background 0.2s' }}>
+                <Megaphone size={18} color="#eab308" /> Main Channel
+              </a>
+              <div style={{ margin: '16px 0', height: '1px', background: 'var(--border)' }} />
+              {user?.role === 'ADMIN' && (
+                <a href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', textDecoration: 'none', color: '#ef4444', fontSize: '14px', fontWeight: 600, transition: 'background 0.2s' }}>
+                  <ShieldAlert size={18} /> Admin Panel
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Body: Filter on top, Results below ── */}
       <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '24px 20px 60px' }}>
