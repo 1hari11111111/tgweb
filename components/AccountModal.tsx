@@ -303,45 +303,15 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
               <div style={{ padding: '16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', color: '#22c55e', fontWeight: 600 }}>
                 ✅ Purchase Successful! Your account file has been downloaded. Check your downloads folder.
               </div>
-            ) : showConfirm ? (
-              <div style={{ padding: '16px', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: '12px', textAlign: 'left' }}>
-                <p style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600, marginBottom: '8px' }}>Confirm Purchase?</p>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                  ₹{(account.price * inrExchangeRate).toFixed(2)} will be deducted from your wallet balance.
-                </p>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={confirmPurchase}
-                    disabled={purchasing}
-                    style={{ flex: 1, padding: '12px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', gap: '6px' }}
-                  >
-                    {purchasing ? <Loader2 size={16} className="spinner" /> : 'Buy Now'}
-                  </button>
-                  <button
-                    onClick={() => setShowConfirm(false)}
-                    disabled={purchasing}
-                    style={{ flex: 1, padding: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
+            {user && (
               <button
-                onClick={() => setShowConfirm(true)}
-                disabled={purchasing || !user || user.balance < account.price * inrExchangeRate}
-                style={{
-                  width: '100%', height: '52px',
-                  background: 'var(--accent)', color: '#fff', fontSize: '15px', fontWeight: 700,
-                  border: 'none', borderRadius: '16px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  transition: 'transform 0.1s, opacity 0.2s', opacity: (purchasing || !user || user.balance < account.price * inrExchangeRate) ? 0.5 : 1
-                }}
+                onClick={() => window.open(`/account/${account.item_id}`, '_blank')}
+                style={{ width: '100%', padding: '12px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', transition: 'transform 0.1s' }}
                 onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
                 onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
               >
-                {purchasing ? <Loader2 size={18} className="spinner" /> : <ShoppingCart size={18} />}
-                {purchasing ? 'PROCESSING...' : 'PAY WITH BALANCE'}
+                <ShoppingCart size={18} />
+                Buy Now
               </button>
             )}
 
@@ -350,15 +320,13 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
                 Please login to purchase this account.
               </p>
             )}
-            {(user && user.balance < account.price * inrExchangeRate && !purchaseSuccess) && (
-              <p style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '12px', textAlign: 'center' }}>
-                Insufficient balance. Please deposit to your wallet.
-              </p>
-            )}
           </div>
 
         </div>
       </div>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+      `}</style>
     </div>
   )
 }

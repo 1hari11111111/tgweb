@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!buyRes.ok) {
-      // If purchase fails, refund the user
+      // Refund the user
       await prisma.user.update({
         where: { id: user.id },
         data: { balance: { increment: costInr } }
@@ -73,7 +73,17 @@ export async function POST(request: NextRequest) {
           reference: String(itemId),
         }
       })
-      return NextResponse.json({ error: 'Failed to purchase from supplier. Refunded.' }, { status: 500 })
+      
+      // Parse specific LZT error
+      let errorMessage = 'Failed to purchase from supplier.'
+      try {
+        const errorData = await buyRes.json()
+        if (errorData.errors && errorData.errors.length > 0) {
+          errorMessage = errorData.errors[0]
+        }
+      } catch (e) {}
+
+      return NextResponse.json({ error: errorMessage }, { status: 400 })
     }
 
     // 5. Try to get download URL for the account file
