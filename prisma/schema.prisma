@@ -5,30 +5,54 @@ generator client {
 // Using SQLite for local development. 
 // User will switch this to 'postgresql' on the VPS.
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id        BigInt   @id
-  username  String?  @unique
-  password  String?  // Plain password for web login
-  balance   Float    @default(0)
-  role      String   @default("USER") // USER, ADMIN
+  id           BigInt        @id @default(autoincrement())
+  username     String?       @unique
+  password     String?       // Plain password for web login
+  balance      Float         @default(0)
+  role         String        @default("USER") // USER, ADMIN
   transactions Transaction[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  purchases    Purchase[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model Transaction {
   id        String   @id @default(uuid())
   userId    BigInt
   user      User     @relation(fields: [userId], references: [id])
-  type      String   // DEPOSIT, PURCHASE
+  type      String   // DEPOSIT, PURCHASE, REFUND
   amount    Float
   currency  String   // INR, USDT
   status    String   // PENDING, APPROVED, REJECTED
   reference String?  // UTR or LZT Item ID
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Purchase {
+  id             String   @id @default(uuid())
+  userId         BigInt
+  user           User     @relation(fields: [userId], references: [id])
+  lztItemId      Int      
+  countryName    String?
+  priceUsd       Float
+  priceInr       Float
+  phoneNumber    String?
+  authKey        String?
+  dcId           String?
+  tgUserId       String?
+  downloadLinks  String?  // JSON string: { tdata: "url", telethon: "url", ... }
+  status         String   @default("COMPLETED") // COMPLETED, REFUNDED
+  createdAt      DateTime @default(now())
+}
+
+model Settings {
+  key   String @id
+  value String
 }

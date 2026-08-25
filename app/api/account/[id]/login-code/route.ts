@@ -12,7 +12,7 @@ export async function POST(
   }
 
   const { id } = await params
-  const settings = getSettings()
+  const settings = await getSettings()
   const LZT_TOKEN = settings.lztApiToken
   const lztBaseUrl = process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market'
 

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Fetch current price from supplier
     const account = await getTelegramAccount(itemId)
-    const settings = getSettings()
+    const settings = await getSettings()
     const costInr = account.price * (settings.inrExchangeRate || 84)
 
     // 2. Check balance
@@ -121,12 +121,29 @@ export async function POST(request: NextRequest) {
       console.error('Failed to fetch login data:', e)
     }
 
+    try {
+      await prisma.purchase.create({
+        data: {
+          userId: user.id,
+          lztItemId: itemId,
+          countryName: account.title?.split(' ')[0] || 'Unknown',
+          priceUsd: account.price,
+          priceInr: costInr,
+          phoneNumber: loginData?.phoneNumber ? String(loginData.phoneNumber) : null,
+          authKey: loginData?.authKey ? String(loginData.authKey) : null,
+          dcId: loginData?.dcId ? String(loginData.dcId) : null,
+          tgUserId: loginData?.userId ? String(loginData.userId) : null,
+        }
+      })
+    } catch (e) {
+      console.error('Failed to save purchase to DB:', e)
+    }
+
     return NextResponse.json({ 
       success: true, 
       itemId,
       loginData,
     })
-
   } catch (err) {
     console.error(err)
     return NextResponse.json({ error: 'Checkout failed' }, { status: 500 })

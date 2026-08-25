@@ -15,7 +15,7 @@ export async function GET(
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type') || 'tdata' // tdata, session_telethon, session_pyrogram, json
 
-  const settings = getSettings()
+  const settings = await getSettings()
   const LZT_TOKEN = settings.lztApiToken
 
   if (!LZT_TOKEN) {

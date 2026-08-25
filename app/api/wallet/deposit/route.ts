@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    const settings = getSettings()
+    const settings = await getSettings()
 
     // Log deposit to admin chat (optional, no Telegram requirement)
     console.log(`[Deposit] User ${sessionUser.username} (${sessionUser.id}) requested ₹${numAmount} — UTR: ${reference} — TxID: ${tx.id}`)

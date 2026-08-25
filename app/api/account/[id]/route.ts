@@ -15,7 +15,7 @@ export async function GET(
 
   try {
     const account = await getTelegramAccount(itemId)
-    const settings = getSettings()
+    const settings = await getSettings()
     return NextResponse.json({ 
       item: account,
       inrExchangeRate: settings.inrExchangeRate || 84

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Shield, Key, Percent, Save, Eye, EyeOff,
-  CheckCircle, AlertTriangle, Lock, ArrowLeft, Loader2, DollarSign, Wallet, QrCode
+  CheckCircle, AlertTriangle, Lock, ArrowLeft, Loader2, DollarSign, Wallet, QrCode, Users, ShoppingBag, BarChart3, Settings as SettingsIcon, LogOut, ChevronRight
 } from 'lucide-react'
 
+// Interfaces
 interface SettingsData {
   lztApiToken: string
   profitPercent: number
@@ -26,22 +27,62 @@ interface Deposit {
   user: { username: string | null }
 }
 
+interface User {
+  id: string
+  username: string | null
+  balance: number
+  role: string
+  createdAt: string
+  _count: { purchases: number, transactions: number }
+}
+
+interface Purchase {
+  id: string
+  userId: string
+  user: { username: string | null }
+  lztItemId: number
+  countryName: string | null
+  priceInr: number
+  status: string
+  createdAt: string
+}
+
+interface AdminStats {
+  totalUsers: number
+  totalRevenue: number
+  totalPurchases: number
+  todayPurchases: number
+  totalSoldAmount: number
+  activeUserBalance: number
+}
+
+type TabType = 'overview' | 'users' | 'deposits' | 'purchases' | 'settings'
+
 export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [isAuthed, setIsAuthed] = useState(false)
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  
+  const [activeTab, setActiveTab] = useState<TabType>('overview')
 
+  // Data states
   const [settings, setSettings] = useState<SettingsData | null>(null)
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [users, setUsers] = useState<User[]>([])
+  const [deposits, setDeposits] = useState<Deposit[]>([])
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Settings inputs
   const [newToken, setNewToken] = useState('')
   const [newProfit, setNewProfit] = useState('')
   const [newExchangeRate, setNewExchangeRate] = useState('')
   const [newUpiId, setNewUpiId] = useState('')
   const [newAdminChatId, setNewAdminChatId] = useState('')
   const [showToken, setShowToken] = useState(false)
-  const [deposits, setDeposits] = useState<Deposit[]>([])
-
   const [saving, setSaving] = useState(false)
+
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -76,7 +117,12 @@ export default function AdminPage() {
       setNewUpiId(data.upiId || '')
       setNewAdminChatId(data.adminChatId || '')
       setIsAuthed(true)
+      
+      // Load all data
+      fetchStats()
+      fetchUsers()
       fetchDeposits()
+      fetchPurchases()
     } catch {
       setAuthError('Connection error. Try again.')
     } finally {
@@ -84,9 +130,43 @@ export default function AdminPage() {
     }
   }
 
-  const handleSave = async () => {
-    setSaving(true)
+  // Fetch functions
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/admin/stats', { headers: { 'x-admin-password': password } })
+      if (res.ok) setStats(await res.json())
+    } catch (e) {}
+  }
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/users', { headers: { 'x-admin-password': password } })
+      if (res.ok) {
+        const data = await res.json()
+        setUsers(data.users || [])
+      }
+    } catch (e) {}
+  }
+  const fetchDeposits = async () => {
+    try {
+      const res = await fetch('/api/admin/deposits', { headers: { 'x-admin-password': password } })
+      if (res.ok) {
+        const data = await res.json()
+        setDeposits(Array.isArray(data) ? data : [])
+      }
+    } catch (e) {}
+  }
+  const fetchPurchases = async () => {
+    try {
+      const res = await fetch('/api/admin/purchases', { headers: { 'x-admin-password': password } })
+      if (res.ok) {
+        const data = await res.json()
+        setPurchases(data.purchases || [])
+      }
+    } catch (e) {}
+  }
 
+  const handleSaveSettings = async () => {
+    setSaving(true)
     try {
       const res = await fetch('/api/admin', {
         method: 'POST',
@@ -100,333 +180,383 @@ export default function AdminPage() {
           adminChatId: newAdminChatId
         })
       })
-      const data = await res.json()
 
-      if (!res.ok) {
-        showToast('error', data.error || 'Failed to save settings')
-        return
+      if (res.ok) {
+        const data = await res.json()
+        setSettings(data)
+        setNewToken('')
+        showToast('success', 'Settings saved successfully')
+      } else {
+        showToast('error', 'Failed to save settings')
       }
-
-      setSettings(data)
-      setNewToken('')
-      setNewProfit(String(data.profitPercent))
-      setNewExchangeRate(String(data.inrExchangeRate))
-      setNewUpiId(data.upiId || '')
-      setNewAdminChatId(data.adminChatId || '')
-      showToast('success', 'Settings saved successfully')
     } catch {
-      showToast('error', 'Connection error. Try again.')
+      showToast('error', 'Connection error')
     } finally {
       setSaving(false)
     }
   }
 
-  const calcExample = () => {
-    const base = 10
-    const profitPct = parseFloat(newProfit) || 0
-    const rate = parseFloat(newExchangeRate) || 84
-    
-    const profitUsd = base * (profitPct / 100)
-    const totalUsd = base + profitUsd
-    const profitInr = profitUsd * rate
+  const handleDepositAction = async (transactionId: string, actionType: 'approve' | 'reject') => {
+    const action = actionType === 'approve' ? 'APPROVE' : 'REJECT'
+    try {
+      const res = await fetch('/api/admin/deposits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, transactionId, action })
+      })
 
-    return `If base price is $10.00: + ${profitPct}% profit = $${totalUsd.toFixed(2)}. Profit = $${profitUsd.toFixed(2)} (₹${profitInr.toFixed(2)} INR)`
-  }
-
-  const fetchDeposits = async () => {
-    const res = await fetch('/api/admin/deposits', { headers: { 'x-admin-password': password } })
-    if (res.ok) setDeposits(await res.json())
-  }
-
-  const handleDepositAction = async (id: string, action: 'APPROVE' | 'REJECT') => {
-    const res = await fetch('/api/admin/deposits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, transactionId: id, action })
-    })
-    if (res.ok) {
-      showToast('success', `Deposit ${action.toLowerCase()}d!`)
-      fetchDeposits()
-    } else {
-      showToast('error', 'Action failed')
+      if (res.ok) {
+        showToast('success', `Deposit ${action}d`)
+        fetchDeposits()
+        fetchStats()
+      } else {
+        const err = await res.json()
+        showToast('error', err.error || 'Failed to update deposit')
+      }
+    } catch {
+      showToast('error', 'Connection error')
     }
   }
 
-  // Login Screen
   if (!isAuthed) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
-        <div style={{ width: '100%', maxWidth: '400px', padding: '24px' }}>
-          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '24px', fontSize: '14px' }}>
-            <ArrowLeft size={16} /> Back to store
-          </a>
-
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '32px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--accent-dim)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                <Shield size={24} color="var(--accent)" />
-              </div>
-              <h1 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Admin Panel</h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Enter your password to access settings</p>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                  <Lock size={14} /> Password
-                </label>
-                <input
-                  type="password"
-                  className="input-base"
-                  style={{ height: '44px', padding: '0 16px', fontSize: '16px' }}
-                  placeholder="Enter admin password"
-                  value={password}
-                  onChange={e => { setPassword(e.target.value); setAuthError('') }}
-                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                  autoFocus
-                />
-              </div>
-
-              {authError && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger)', fontSize: '14px', background: 'rgba(220,38,38,0.1)', padding: '12px', borderRadius: '4px', border: '1px solid rgba(220,38,38,0.2)' }}>
-                  <AlertTriangle size={16} /> {authError}
-                </div>
-              )}
-
-              <button
-                onClick={handleLogin}
-                disabled={authLoading}
-                style={{
-                  height: '44px', background: 'var(--accent)', color: '#fff', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase',
-                  border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 200ms ease'
-                }}
-              >
-                {authLoading ? <Loader2 size={18} className="spinner" /> : <Shield size={18} />}
-                {authLoading ? 'Verifying...' : 'Sign In'}
-              </button>
-            </div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', padding: '20px' }}>
+        <div style={{ width: '100%', maxWidth: '400px', background: 'var(--bg-card)', padding: '32px', borderRadius: '16px', border: '1px solid var(--border)', textAlign: 'center' }}>
+          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+            <Shield size={32} color="#ef4444" />
           </div>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Admin Login</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>Enter the admin password to access the panel.</p>
+          
+          <div style={{ position: 'relative', marginBottom: '24px' }}>
+            <Lock size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="password"
+              placeholder="Admin Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              style={{ width: '100%', padding: '14px 16px 14px 48px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text-primary)', fontSize: '16px', outline: 'none' }}
+            />
+          </div>
+
+          {authError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', fontSize: '14px', marginBottom: '24px', justifyContent: 'center' }}>
+              <AlertTriangle size={16} /> {authError}
+            </div>
+          )}
+
+          <button
+            onClick={handleLogin}
+            disabled={authLoading}
+            style={{ width: '100%', padding: '14px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 600, cursor: authLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            {authLoading ? <Loader2 size={20} className="spinner" /> : 'Login'}
+          </button>
+          
+          <a href="/" style={{ display: 'block', marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none' }}>
+            &larr; Back to Market
+          </a>
         </div>
       </div>
     )
   }
 
-  // Admin Dashboard
+  const TabButton = ({ id, icon: Icon, label }: { id: TabType, icon: any, label: string }) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px',
+        width: '100%', textAlign: 'left', background: activeTab === id ? 'var(--bg-elevated)' : 'transparent',
+        border: 'none', borderRadius: '8px', color: activeTab === id ? 'var(--accent)' : 'var(--text-muted)',
+        fontWeight: activeTab === id ? 600 : 500, cursor: 'pointer', transition: 'all 0.2s'
+      }}
+    >
+      <Icon size={18} /> {label}
+    </button>
+  )
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', padding: '48px 24px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex' }}>
       
       {/* Toast */}
       {toast && (
-        <div style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 1000, background: 'var(--bg-elevated)', border: `1px solid ${toast.type === 'success' ? 'var(--success)' : 'var(--danger)'}`, borderRadius: '4px', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-primary)', boxShadow: '0 10px 40px rgba(0,0,0,0.5)', animation: 'fadeIn 200ms ease' }}>
-          {toast.type === 'success' ? <CheckCircle size={20} color="var(--success)" /> : <AlertTriangle size={20} color="var(--danger)" />}
-          <span style={{ fontSize: '14px', fontWeight: 500 }}>{toast.message}</span>
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: toast.type === 'success' ? 'var(--success)' : '#ef4444', color: 'white', padding: '16px 24px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1000, animation: 'slideUp 0.3s ease-out' }}>
+          {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+          <span style={{ fontWeight: 600 }}>{toast.message}</span>
         </div>
       )}
 
-      <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-        
-        {/* Header */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <a href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', textDecoration: 'none', fontSize: '14px' }}>
-            <ArrowLeft size={16} /> Back to store
-          </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--accent-dim)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Shield size={20} color="var(--accent)" />
+      {/* Sidebar */}
+      <div style={{ width: '280px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={20} color="#ef4444" />
             </div>
             <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>Admin Settings</h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Manage your LZT Market configuration</p>
+              <h1 style={{ fontSize: '18px', fontWeight: 700 }}>Admin Panel</h1>
+              <a href="/" style={{ fontSize: '12px', color: 'var(--text-muted)', textDecoration: 'none' }}>&larr; Back to Website</a>
             </div>
           </div>
         </div>
+        
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+          <TabButton id="overview" icon={BarChart3} label="Overview" />
+          <TabButton id="users" icon={Users} label="Users" />
+          <TabButton id="deposits" icon={Wallet} label="Deposits" />
+          <TabButton id="purchases" icon={ShoppingBag} label="Purchases" />
+          <TabButton id="settings" icon={SettingsIcon} label="Settings" />
+        </div>
 
-        {/* Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* API Token Card */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Key size={16} color="#818cf8" />
-              </div>
-              <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>LZT API Token</h2>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Authentication token for LZT Market API</p>
-              </div>
-            </div>
+        <div style={{ padding: '24px', borderTop: '1px solid var(--border)' }}>
+          <button onClick={() => { setIsAuthed(false); setPassword('') }} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', width: '100%', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
+      </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Current Token</span>
-                <span style={{ fontWeight: 600, color: settings?.hasToken ? 'var(--success)' : 'var(--danger)' }}>{settings?.hasToken ? '● Active' : '● Not Set'}</span>
+      {/* Main Content */}
+      <div style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
+        
+        {/* TAB: OVERVIEW */}
+        {activeTab === 'overview' && (
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>Dashboard Overview</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+              <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={16} /> Total Users
+                </div>
+                <div style={{ fontSize: '32px', fontWeight: 700 }}>{stats?.totalUsers || 0}</div>
               </div>
-              {settings?.hasToken && <div style={{ background: 'var(--bg-elevated)', padding: '12px', borderRadius: '4px', fontSize: '14px', fontFamily: 'monospace', color: 'var(--text-primary)' }}>{settings.lztApiToken}</div>}
-            </div>
-
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                <Key size={14} /> New Token
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showToken ? 'text' : 'password'}
-                  className="input-base"
-                  style={{ height: '40px', padding: '0 40px 0 16px', width: '100%', fontSize: '14px' }}
-                  placeholder="Paste new API token..."
-                  value={newToken}
-                  onChange={e => setNewToken(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowToken(!showToken)}
-                  style={{ position: 'absolute', right: '12px', top: '10px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                >
-                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+              <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Wallet size={16} /> Total Revenue (INR)
+                </div>
+                <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--success)' }}>₹{stats?.totalRevenue?.toFixed(2) || '0.00'}</div>
               </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Leave empty to keep current token</p>
+              <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShoppingBag size={16} /> Total Purchases
+                </div>
+                <div style={{ fontSize: '32px', fontWeight: 700 }}>{stats?.totalPurchases || 0}</div>
+              </div>
+              <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShoppingBag size={16} /> Today's Sales
+                </div>
+                <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--accent)' }}>{stats?.todayPurchases || 0}</div>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Pricing & Profit Card */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Percent size={16} color="#22c55e" />
-              </div>
-              <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>Pricing & Profit</h2>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Configure profit markup and currency exchange</p>
-              </div>
+        {/* TAB: USERS */}
+        {activeTab === 'users' && (
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>User Management</h2>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>User</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Balance</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Purchases</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Joined</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '16px 24px', fontWeight: 600 }}>{u.username || `User #${u.id}`}</td>
+                      <td style={{ padding: '16px 24px', color: 'var(--accent)', fontWeight: 600 }}>₹{u.balance.toFixed(2)}</td>
+                      <td style={{ padding: '16px 24px' }}>{u._count.purchases}</td>
+                      <td style={{ padding: '16px 24px', color: 'var(--text-muted)', fontSize: '14px' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          </div>
+        )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <DollarSign size={14} color="var(--accent)" /> Base Currency to INR Rate
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="number"
-                    className="input-base"
-                    placeholder="e.g. 84.50"
-                    value={newExchangeRate}
-                    onChange={e => setNewExchangeRate(e.target.value)}
-                    style={{ width: '100%', paddingLeft: '32px' }}
-                  />
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '14px' }}>₹</span>
+        {/* TAB: DEPOSITS */}
+        {activeTab === 'deposits' && (
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>Deposit Requests</h2>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>User</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Amount</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Reference / UTR</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Status</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deposits.map(d => (
+                    <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '16px 24px', fontWeight: 600 }}>{d.user?.username || 'Unknown'}</td>
+                      <td style={{ padding: '16px 24px', fontWeight: 600 }}>₹{d.amount.toFixed(2)}</td>
+                      <td style={{ padding: '16px 24px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{d.reference}</td>
+                      <td style={{ padding: '16px 24px' }}>
+                        <span style={{ 
+                          padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600,
+                          background: d.status === 'APPROVED' ? 'rgba(34, 197, 94, 0.1)' : d.status === 'REJECTED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(234, 179, 8, 0.1)',
+                          color: d.status === 'APPROVED' ? '#22c55e' : d.status === 'REJECTED' ? '#ef4444' : '#eab308'
+                        }}>
+                          {d.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px 24px' }}>
+                        {d.status === 'PENDING' && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => handleDepositAction(d.id, 'approve')} style={{ padding: '6px 12px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Approve</button>
+                            <button onClick={() => handleDepositAction(d.id, 'reject')} style={{ padding: '6px 12px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Reject</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {deposits.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No deposit requests.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: PURCHASES */}
+        {activeTab === 'purchases' && (
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>All Purchases</h2>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>User</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Item ID</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Country</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Price (INR)</th>
+                    <th style={{ padding: '16px 24px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.map(p => (
+                    <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '16px 24px', fontWeight: 600 }}>{p.user?.username || 'Unknown'}</td>
+                      <td style={{ padding: '16px 24px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{p.lztItemId}</td>
+                      <td style={{ padding: '16px 24px' }}>{p.countryName || '-'}</td>
+                      <td style={{ padding: '16px 24px', fontWeight: 600 }}>₹{p.priceInr.toFixed(2)}</td>
+                      <td style={{ padding: '16px 24px', color: 'var(--text-muted)', fontSize: '14px' }}>{new Date(p.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                  {purchases.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No purchases yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: SETTINGS */}
+        {activeTab === 'settings' && (
+          <div style={{ maxWidth: '600px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>Platform Settings</h2>
+            <div style={{ display: 'grid', gap: '20px' }}>
+              
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}><Key size={18} /> API Configuration</h3>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>LZT API Token</label>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        type={showToken ? 'text' : 'password'}
+                        placeholder={settings?.lztApiToken || 'Enter new token'}
+                        value={newToken}
+                        onChange={(e) => setNewToken(e.target.value)}
+                        style={{ width: '100%', padding: '12px 40px 12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+                      />
+                      <button onClick={() => setShowToken(!showToken)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                        {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  {settings?.hasToken && !newToken && (
+                    <div style={{ fontSize: '12px', color: 'var(--success)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle size={14} /> Active token is set
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <QrCode size={14} color="var(--accent)" /> Wallet UPI ID
-                </label>
-                <input
-                  type="text"
-                  className="input-base"
-                  placeholder="e.g. yourname@upi"
-                  value={newUpiId}
-                  onChange={e => setNewUpiId(e.target.value)}
-                  style={{ width: '100%' }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                <Percent size={14} /> Profit Margin (%)
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="number"
-                  className="input-base"
-                  style={{ height: '40px', padding: '0 40px 0 16px', width: '100%', fontSize: '14px' }}
-                  placeholder="e.g. 10"
-                  min={0} max={1000} step={0.1}
-                  value={newProfit}
-                  onChange={e => setNewProfit(e.target.value)}
-                />
-                <span style={{ position: 'absolute', right: '16px', top: '10px', color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500 }}>%</span>
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                <Shield size={14} /> Admin Telegram Chat ID (For Notifications)
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  className="input-base"
-                  style={{ height: '40px', padding: '0 16px', width: '100%', fontSize: '14px' }}
-                  placeholder="e.g. 123456789"
-                  value={newAdminChatId}
-                  onChange={e => setNewAdminChatId(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '4px', display: 'flex', alignItems: 'flex-start', gap: '12px', border: '1px solid var(--border)' }}>
-              <div style={{ color: 'var(--info)' }}><AlertTriangle size={18} /></div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>Pricing Example:</strong>
-                {calcExample()}
-              </div>
-            </div>
-
-          </div>
-
-          {/* Deposits Card */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Wallet size={16} color="#eab308" />
-              </div>
-              <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>Pending Deposits</h2>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Approve or reject user wallet deposits</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {deposits.length === 0 ? (
-                <p style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>No pending deposits.</p>
-              ) : (
-                deposits.map(d => (
-                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div>
-                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>₹{d.amount} {d.currency}</p>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>User: {d.user?.username || d.userId} • UTR: {d.reference}</p>
-                      <span style={{ fontSize: '11px', padding: '2px 6px', background: d.status === 'PENDING' ? 'rgba(234,179,8,0.2)' : (d.status === 'APPROVED' ? 'rgba(34,197,94,0.2)' : 'rgba(220,38,38,0.2)'), color: d.status === 'PENDING' ? '#eab308' : (d.status === 'APPROVED' ? '#22c55e' : '#dc2626'), borderRadius: '4px', display: 'inline-block', marginTop: '6px' }}>{d.status}</span>
-                    </div>
-                    {d.status === 'PENDING' && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => handleDepositAction(d.id, 'APPROVE')} style={{ padding: '6px 12px', background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Approve</button>
-                        <button onClick={() => handleDepositAction(d.id, 'REJECT')} style={{ padding: '6px 12px', background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Reject</button>
-                      </div>
-                    )}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}><Percent size={18} /> Financial Settings</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Profit Margin (%)</label>
+                    <input
+                      type="number"
+                      value={newProfit}
+                      onChange={(e) => setNewProfit(e.target.value)}
+                      style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+                    />
                   </div>
-                ))
-              )}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>USD to INR Rate</label>
+                    <input
+                      type="number"
+                      value={newExchangeRate}
+                      onChange={(e) => setNewExchangeRate(e.target.value)}
+                      style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}><QrCode size={18} /> Payment & Contact</h3>
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Deposit UPI ID</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. yourname@upi"
+                      value={newUpiId}
+                      onChange={(e) => setNewUpiId(e.target.value)}
+                      style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Support URL (e.g. Telegram link)</label>
+                    <input
+                      type="text"
+                      placeholder="https://t.me/your_bot"
+                      value={newAdminChatId}
+                      onChange={(e) => setNewAdminChatId(e.target.value)}
+                      style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveSettings}
+                disabled={saving}
+                style={{ width: '100%', padding: '16px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '12px' }}
+              >
+                {saving ? <Loader2 size={20} className="spinner" /> : <><Save size={20} /> Save All Changes</>}
+              </button>
+
             </div>
           </div>
-
-        </div>
-
-        {/* Save Button */}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{
-            height: '48px', background: 'var(--accent)', color: '#fff', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase',
-            border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 200ms ease'
-          }}
-        >
-          {saving ? <Loader2 size={18} className="spinner" /> : <Save size={18} />}
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+        )}
 
       </div>
     </div>

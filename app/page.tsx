@@ -188,6 +188,9 @@ export default function HomePage() {
                       <ShieldAlert size={18} /> Admin Panel
                     </a>
                   )}
+                  <a href="/profile" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600 }}>
+                    <User size={18} /> My Profile
+                  </a>
                   <button
                     onClick={async () => { await logout(); setShowSidebar(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', width: '100%' }}

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const settings = getSettings()
+  const settings = await getSettings()
   return NextResponse.json({
     lztApiToken: maskToken(settings.lztApiToken),
     profitPercent: settings.profitPercent,
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     updates.adminChatId = String(adminChatId)
   }
 
-  const updated = updateSettings(updates)
+  const updated = await updateSettings(updates)
 
   return NextResponse.json({
     success: true,
