@@ -10,11 +10,15 @@ export async function POST(request: NextRequest) {
     // Handle /start command
     if (update.message && update.message.text === '/start') {
       const chatId = update.message.chat.id
+      const host = request.headers.get('host') || 'vaishustore.duckdns.org'
+      const protocol = host.includes('localhost') ? 'http' : 'https'
+      const siteUrl = `${protocol}://${host}`
+      
       if (bot) {
         await bot.sendMessage(chatId, 'Welcome to the TGAccounts Marketplace! Click the button below to open the store and browse available accounts.', {
           reply_markup: {
             inline_keyboard: [[
-              { text: '🛒 Open Store', web_app: { url: 'https://vaishustore.duckdns.org' } }
+              { text: '🛒 Open Store', web_app: { url: siteUrl } }
             ]]
           }
         }).catch(console.error)
