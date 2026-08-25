@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { bot } from '@/lib/bot'
+import { getBot } from '@/lib/bot'
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url')
@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Please provide a ?url= parameter with your domain (e.g. https://your-domain.com)' }, { status: 400 })
   }
 
+  const bot = getBot()
   if (!bot) {
     return NextResponse.json({ error: 'Telegram Bot not initialized. Check TELEGRAM_BOT_TOKEN.' }, { status: 500 })
   }

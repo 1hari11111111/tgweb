@@ -1,10 +1,19 @@
 const TelegramBot = require('node-telegram-bot-api')
-const BotConstructor = TelegramBot.default || TelegramBot
 
-const token = process.env.TELEGRAM_BOT_TOKEN || ''
-export const bot = token ? new BotConstructor(token, { polling: false }) : null
+let botInstance: any = null
+
+export function getBot() {
+  if (botInstance) return botInstance
+  
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return null
+  
+  botInstance = new TelegramBot(token, { polling: false })
+  return botInstance
+}
 
 export async function sendTelegramMessage(chatId: string | number, text: string) {
+  const bot = getBot()
   if (!bot) {
     console.error('Bot token is missing. Message not sent.')
     return
@@ -17,6 +26,7 @@ export async function sendTelegramMessage(chatId: string | number, text: string)
 }
 
 export async function sendTelegramDocument(chatId: string | number, document: Buffer, filename: string, caption?: string) {
+  const bot = getBot()
   if (!bot) return
   try {
     await bot.sendDocument(chatId, document, { caption }, { filename })
