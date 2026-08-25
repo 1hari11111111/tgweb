@@ -1,88 +1,101 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
 
-interface WebAppUser {
+interface WebUser {
   id: string
-  username?: string
+  username: string
   balance: number
   role: string
 }
 
-interface TmaContextType {
-  user: WebAppUser | null
+interface AuthContextType {
+  user: WebUser | null
   loading: boolean
-  initData: string | null
   upiId: string | null
+  login: (username: string, password: string) => Promise<{ error?: string }>
+  logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
 
-const TmaContext = createContext<TmaContextType>({
+const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  initData: null,
   upiId: null,
+  login: async () => ({}),
+  logout: async () => {},
   refreshUser: async () => {},
 })
 
-export const useTma = () => useContext(TmaContext)
+export const useAuth = () => useContext(AuthContext)
+
+// Keep useTma as an alias so existing components still work without changes
+export const useTma = () => {
+  const auth = useAuth()
+  return {
+    user: auth.user,
+    loading: auth.loading,
+    initData: auth.user ? 'web_session' : null,  // non-null means logged in
+    upiId: auth.upiId,
+    refreshUser: auth.refreshUser,
+  }
+}
 
 export function TmaProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<WebAppUser | null>(null)
+  const [user, setUser] = useState<WebUser | null>(null)
   const [loading, setLoading] = useState(true)
-  const [initData, setInitData] = useState<string | null>(null)
   const [upiId, setUpiId] = useState<string | null>(null)
 
-  const authenticate = async (data: string) => {
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth', { method: 'GET' })
+      if (res.ok) {
+        const json = await res.json()
+        if (json.user) {
+          setUser(json.user)
+          setUpiId(json.upiId || null)
+        } else {
+          setUser(null)
+          setUpiId(null)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const login = useCallback(async (username: string, password: string): Promise<{ error?: string }> => {
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData: data })
+        body: JSON.stringify({ username, password }),
       })
-      if (res.ok) {
-        const json = await res.json()
+      const json = await res.json()
+      if (res.ok && json.user) {
         setUser(json.user)
-        setUpiId(json.upiId)
-      } else {
-        console.error('TMA Auth failed', await res.text())
+        setUpiId(json.upiId || null)
+        return {}
       }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const refreshUser = async () => {
-    if (initData) {
-      await authenticate(initData)
-    }
-  }
-
-  useEffect(() => {
-    // Check if running inside Telegram
-    const twa = (window as any).Telegram?.WebApp
-    if (twa && twa.initData) {
-      twa.ready()
-      twa.expand()
-      setInitData(twa.initData)
-      authenticate(twa.initData)
-    } else {
-      // Mock for desktop browser testing in development
-      if (process.env.NODE_ENV === 'development') {
-        const mockInitData = 'mock_admin_data'
-        setInitData(mockInitData)
-        authenticate(mockInitData)
-      } else {
-        setLoading(false)
-      }
+      return { error: json.error || 'Login failed' }
+    } catch {
+      return { error: 'Network error' }
     }
   }, [])
 
+  const logout = useCallback(async () => {
+    await fetch('/api/auth', { method: 'DELETE' })
+    setUser(null)
+    setUpiId(null)
+  }, [])
+
+  useEffect(() => {
+    refreshUser().finally(() => setLoading(false))
+  }, [refreshUser])
+
   return (
-    <TmaContext.Provider value={{ user, loading, initData, upiId, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, upiId, login, logout, refreshUser }}>
       {children}
-    </TmaContext.Provider>
+    </AuthContext.Provider>
   )
 }

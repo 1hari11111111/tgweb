@@ -1,36 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
-import { validateInitData, parseInitData } from '@/lib/twa'
-import { bot } from '@/lib/bot'
+import { getSessionUser } from '@/lib/session'
 import { getSettings } from '@/lib/settings'
 
 export async function POST(request: NextRequest) {
-  const { initData, amount, reference } = await request.json()
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
-
-  if (!initData || !botToken || !amount || !reference) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  }
-
-  const isValid = validateInitData(initData, botToken)
-  if (!isValid) {
-    return NextResponse.json({ error: 'Invalid authentication signature' }, { status: 401 })
-  }
-
-  const tgUser = parseInitData(initData)
-  if (!tgUser) {
-    return NextResponse.json({ error: 'Could not parse user data' }, { status: 400 })
-  }
-
-  const numAmount = parseFloat(amount)
-  if (isNaN(numAmount) || numAmount <= 0) {
-    return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
-  }
-
   try {
+    const sessionUser = await getSessionUser(request)
+    if (!sessionUser) {
+      return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
+    }
+
+    const { amount, reference } = await request.json()
+
+    if (!amount || !reference) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    const numAmount = parseFloat(amount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
+    }
+
     const tx = await prisma.transaction.create({
       data: {
-        userId: BigInt(tgUser.id),
+        userId: BigInt(sessionUser.id),
         type: 'DEPOSIT',
         amount: numAmount,
         currency: 'INR',
@@ -40,33 +33,15 @@ export async function POST(request: NextRequest) {
     })
 
     const settings = getSettings()
-    
-    // Notify Admin via Telegram
-    if (settings.adminChatId && bot) {
-      const message = `🔔 <b>New Deposit Request</b>\n\nUser ID: <code>${tgUser.id}</code>\nAmount: ₹${numAmount}\nUTR: <code>${reference}</code>`
-      
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: '✅ Approve', callback_data: `approve_deposit_${tx.id}` },
-            { text: '❌ Reject', callback_data: `reject_deposit_${tx.id}` }
-          ],
-          [
-            { text: '✏️ Custom Amount', callback_data: `custom_deposit_${tx.id}` }
-          ]
-        ]
-      }
 
-      await bot.sendMessage(settings.adminChatId, message, {
-        parse_mode: 'HTML',
-        reply_markup: keyboard
-      }).catch(console.error)
-    }
+    // Log deposit to admin chat (optional, no Telegram requirement)
+    console.log(`[Deposit] User ${sessionUser.username} (${sessionUser.id}) requested ₹${numAmount} — UTR: ${reference} — TxID: ${tx.id}`)
 
     return NextResponse.json({
       success: true,
       transactionId: tx.id,
-      message: 'Deposit request submitted. Waiting for admin approval.'
+      message: 'Deposit request submitted. Waiting for admin approval.',
+      adminContactHint: settings.adminChatId || null,
     })
   } catch (error) {
     console.error(error)

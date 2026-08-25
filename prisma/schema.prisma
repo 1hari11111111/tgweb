@@ -10,8 +10,9 @@ datasource db {
 }
 
 model User {
-  id        BigInt   @id // Telegram User ID
-  username  String?
+  id        BigInt   @id
+  username  String?  @unique
+  password  String?  // Plain password for web login
   balance   Float    @default(0)
   role      String   @default("USER") // USER, ADMIN
   transactions Transaction[]

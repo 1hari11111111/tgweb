@@ -19,11 +19,7 @@ export default function WalletModal({ onClose }: { onClose: () => void }) {
       const res = await fetch('/api/wallet/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          initData,
-          amount,
-          reference
-        })
+        body: JSON.stringify({ amount, reference })
       })
       if (res.ok) {
         setSuccess(true)

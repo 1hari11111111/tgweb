@@ -4,9 +4,11 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import FilterPanel, { FilterValues } from '@/components/FilterPanel'
 import ResultsSection from '@/components/ResultsSection'
 import WalletModal from '@/components/WalletModal'
+import LoginModal from '@/components/LoginModal'
 import { useTma } from '@/components/TmaProvider'
+import { useAuth } from '@/components/TmaProvider'
 import { TelegramAccount } from '@/lib/lzt'
-import { Wallet, Menu, X, MessageCircle, Megaphone, User, ShieldAlert } from 'lucide-react'
+import { Wallet, Menu, X, User, ShieldAlert, LogIn, LogOut, MessageCircle, Megaphone } from 'lucide-react'
 
 interface SearchResult {
   items: TelegramAccount[]
@@ -27,7 +29,9 @@ export default function HomePage() {
   const [hasFetched, setHasFetched] = useState(false)
   const [showWallet, setShowWallet] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
   const { user } = useTma()
+  const { logout } = useAuth()
   const abortRef = useRef<AbortController | null>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
 
@@ -74,7 +78,6 @@ export default function HomePage() {
     }
   }, [buildQueryString])
 
-  // Auto-load on first render
   useEffect(() => { fetchAccounts({}, 1, 'pdate_to_down') }, [])
 
   const handleFetch = () => { setCurrentPage(1); fetchAccounts(filters, 1, sortBy) }
@@ -116,13 +119,22 @@ export default function HomePage() {
             </div>
             <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)' }}>TGAccounts</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button
-              onClick={() => setShowWallet(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}
-            >
-              <Wallet size={14} color="var(--accent)" /> Wallet{user !== null ? `: ₹ ${user.balance.toFixed(2)}` : ''}
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {user ? (
+              <button
+                onClick={() => setShowWallet(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}
+              >
+                <Wallet size={14} color="var(--accent)" /> ₹ {user.balance.toFixed(2)}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowLogin(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--accent)', border: 'none', borderRadius: '6px', padding: '6px 14px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}
+              >
+                <LogIn size={14} /> Login
+              </button>
+            )}
             
             <button
               onClick={() => setShowSidebar(true)}
@@ -130,7 +142,6 @@ export default function HomePage() {
             >
               <Menu size={20} />
             </button>
-            
           </div>
         </div>
       </nav>
@@ -140,38 +151,71 @@ export default function HomePage() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={() => setShowSidebar(false)} />
           <div style={{ position: 'relative', width: '280px', height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideLeft 0.2s ease-out' }}>
+            {/* User Header */}
             <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: user ? 'var(--accent)' : 'var(--text-muted)' }}>
                   <User size={20} />
                 </div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '15px' }}>{user?.username || 'Guest'}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {user?.id || '---'}</div>
+                  {user ? (
+                    <div style={{ fontSize: '12px', color: 'var(--accent)' }}>₹ {user.balance.toFixed(2)} balance</div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Not logged in</div>
+                  )}
                 </div>
               </div>
               <button onClick={() => setShowSidebar(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
             </div>
+
+            {/* Nav Links */}
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px', flexGrow: 1 }}>
-              <a href="https://t.me/your_support_bot" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500, transition: 'background 0.2s' }}>
+              <a href="https://t.me/your_support_bot" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500 }}>
                 <MessageCircle size={18} color="var(--accent)" /> Support Chat
               </a>
-              <a href="https://t.me/your_main_channel" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500, transition: 'background 0.2s' }}>
+              <a href="https://t.me/your_main_channel" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500 }}>
                 <Megaphone size={18} color="#eab308" /> Main Channel
               </a>
-              <div style={{ margin: '16px 0', height: '1px', background: 'var(--border)' }} />
-              <a href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', textDecoration: 'none', color: '#ef4444', fontSize: '14px', fontWeight: 600, transition: 'background 0.2s' }}>
-                <ShieldAlert size={18} /> Admin Panel
-              </a>
+            </div>
+
+            {/* Bottom actions */}
+            <div style={{ padding: '20px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {user ? (
+                <>
+                  {user.role === 'ADMIN' && (
+                    <a href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', textDecoration: 'none', color: '#ef4444', fontSize: '14px', fontWeight: 600 }}>
+                      <ShieldAlert size={18} /> Admin Panel
+                    </a>
+                  )}
+                  <button
+                    onClick={async () => { await logout(); setShowSidebar(false) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', width: '100%' }}
+                  >
+                    <LogOut size={18} /> Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <a href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', textDecoration: 'none', color: '#ef4444', fontSize: '14px', fontWeight: 600 }}>
+                    <ShieldAlert size={18} /> Admin Panel
+                  </a>
+                  <button
+                    onClick={() => { setShowSidebar(false); setShowLogin(true) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer', width: '100%' }}
+                  >
+                    <LogIn size={18} /> Login / Register
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Body: Filter on top, Results below ── */}
+      {/* ── Body ── */}
       <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '24px 20px 60px' }}>
         
-        {/* Filter Area */}
         <div style={{ marginBottom: '32px' }}>
           <FilterPanel
             values={filters}
@@ -182,7 +226,6 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Results Area */}
         <div ref={resultsRef}>
           <ResultsSection
             results={results}
@@ -197,10 +240,10 @@ export default function HomePage() {
             onReset={handleReset}
           />
         </div>
-
       </div>
 
       {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
     </div>
   )
 }

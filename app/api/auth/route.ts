@@ -1,64 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
-import { validateInitData, parseInitData } from '@/lib/twa'
 import { getSettings } from '@/lib/settings'
+import { makeSessionToken } from '@/lib/session'
 
 export async function POST(request: NextRequest) {
-  const { initData } = await request.json()
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  try {
+    const { username, password } = await request.json()
 
-  if (!initData || !botToken) {
-    return NextResponse.json({ error: 'Missing data or token' }, { status: 400 })
-  }
-
-  // Dev Mode Mock
-  if (initData === 'mock_admin_data' && process.env.NODE_ENV === 'development') {
-    const user = await prisma.user.upsert({
-      where: { id: BigInt(123456789) },
-      update: {},
-      create: {
-        id: BigInt(123456789),
-        username: 'AdminTest',
-        balance: 1000,
-        role: 'ADMIN',
-      }
-    })
-    return NextResponse.json({
-      success: true,
-      user: { ...user, id: user.id.toString() },
-      upiId: getSettings().upiId
-    })
-  }
-
-  const isValid = validateInitData(initData, botToken)
-  if (!isValid) {
-    return NextResponse.json({ error: 'Invalid authentication signature' }, { status: 401 })
-  }
-
-  const tgUser = parseInitData(initData)
-  if (!tgUser) {
-    return NextResponse.json({ error: 'Could not parse user data' }, { status: 400 })
-  }
-
-  // Create or update user
-  const user = await prisma.user.upsert({
-    where: { id: BigInt(tgUser.id) },
-    update: { username: tgUser.username },
-    create: {
-      id: BigInt(tgUser.id),
-      username: tgUser.username,
-      balance: 0,
-      role: 'USER',
+    if (!username || !password) {
+      return NextResponse.json({ error: 'Username and password required' }, { status: 400 })
     }
-  })
 
-  // Convert BigInt to string for JSON serialization
-  return NextResponse.json({
-    success: true,
-    user: {
-      ...user,
-      id: user.id.toString(),
-    },
-    upiId: getSettings().upiId
-  })
+    // Find user by username
+    const user = await prisma.user.findFirst({ where: { username } })
+
+    if (!user) {
+      return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
+    }
+
+    // Simple password check — stored in user.passwordHash as plaintext for now
+    const userRecord = user as any
+    if (userRecord.password !== password) {
+      return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
+    }
+
+    const token = makeSessionToken(user.id.toString())
+    const settings = getSettings()
+
+    const response = NextResponse.json({
+      success: true,
+      user: {
+        id: user.id.toString(),
+        username: user.username,
+        balance: user.balance,
+        role: user.role,
+      },
+      upiId: settings.upiId,
+    })
+
+    response.cookies.set('session_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: '/',
+    })
+
+    return response
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Login failed' }, { status: 500 })
+  }
+}
+
+// GET: return current session user
+export async function GET(request: NextRequest) {
+  try {
+    const token = request.cookies.get('session_token')?.value
+    if (!token) return NextResponse.json({ user: null })
+
+    const [userIdStr] = token.split(':')
+    if (!userIdStr) return NextResponse.json({ user: null })
+
+    const user = await prisma.user.findUnique({ where: { id: BigInt(userIdStr) } })
+    if (!user) return NextResponse.json({ user: null })
+
+    const settings = getSettings()
+
+    return NextResponse.json({
+      user: {
+        id: user.id.toString(),
+        username: user.username,
+        balance: user.balance,
+        role: user.role,
+      },
+      upiId: settings.upiId,
+    })
+  } catch {
+    return NextResponse.json({ user: null })
+  }
+}
+
+// DELETE: logout
+export async function DELETE() {
+  const response = NextResponse.json({ success: true })
+  response.cookies.set('session_token', '', { maxAge: 0, path: '/' })
+  return response
 }

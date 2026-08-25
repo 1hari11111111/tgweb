@@ -1,32 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
-import { validateInitData, parseInitData } from '@/lib/twa'
 import { getTelegramAccount } from '@/lib/lzt'
 import { getSettings } from '@/lib/settings'
-import { sendTelegramMessage, bot } from '@/lib/bot'
+import { getSessionUser } from '@/lib/session'
 
 export async function POST(request: NextRequest) {
-  const { initData, itemId } = await request.json()
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
-
-  if (!initData || !itemId || !botToken) {
-    return NextResponse.json({ error: 'Missing required data' }, { status: 400 })
-  }
-
-  const isValid = validateInitData(initData, botToken)
-  if (!isValid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const tgUser = parseInitData(initData)
-  if (!tgUser) return NextResponse.json({ error: 'Invalid user data' }, { status: 400 })
-
   try {
-    const user = await prisma.user.findUnique({ where: { id: BigInt(tgUser.id) } })
+    const sessionUser = await getSessionUser(request)
+    if (!sessionUser) {
+      return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
+    }
+
+    const { itemId } = await request.json()
+    if (!itemId) {
+      return NextResponse.json({ error: 'Missing item ID' }, { status: 400 })
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: BigInt(sessionUser.id) } })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
     // 1. Fetch current price from supplier
     const account = await getTelegramAccount(itemId)
     const settings = getSettings()
-    
     const costInr = account.price * (settings.inrExchangeRate || 84)
 
     // 2. Check balance
@@ -52,8 +47,7 @@ export async function POST(request: NextRequest) {
       })
     ])
 
-    // 4. BUY FROM LZT (Simulated / API Call)
-    // NOTE: Replace this with the actual LZT /fast-buy endpoint
+    // 4. BUY FROM LZT
     const LZT_TOKEN = settings.lztApiToken
     const buyRes = await fetch(`${process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market'}/${itemId}/fast-buy`, {
       method: 'POST',
@@ -82,39 +76,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to purchase from supplier. Refunded.' }, { status: 500 })
     }
 
-    // 5. SEND TO TELEGRAM BOT
-    if (bot) {
-      try {
-        const downloadRes = await fetch(`${process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market'}/${itemId}/download`, {
-          headers: { 'Authorization': `Bearer ${LZT_TOKEN}` }
-        })
-
-        if (downloadRes.ok) {
-          const contentType = downloadRes.headers.get('content-type') || ''
-          const buffer = Buffer.from(await downloadRes.arrayBuffer())
-          
-          let ext = '.txt'
-          if (contentType.includes('zip')) ext = '.zip'
-          else if (contentType.includes('json')) ext = '.json'
-
-          await bot.sendDocument(tgUser.id, buffer, { 
-            filename: `Account_${itemId}${ext}` 
-          }, { 
-            caption: `🎉 <b>Purchase Successful!</b>\n\nHere is your purchased Telegram Account #${itemId}.` 
-          })
-        } else {
-          await sendTelegramMessage(
-            tgUser.id, 
-            `🎉 <b>Purchase Successful!</b>\n\nYou have purchased Telegram Account #${itemId}, but we failed to auto-download the file. Please contact support to receive your file.`
-          )
-        }
-      } catch (err) {
-        console.error("Error sending file:", err)
-        await sendTelegramMessage(tgUser.id, `🎉 Purchase successful (Account #${itemId}), but file delivery failed.`)
+    // 5. Try to get download URL for the account file
+    let downloadUrl: string | null = null
+    try {
+      const downloadRes = await fetch(`${process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market'}/${itemId}/download`, {
+        headers: { 'Authorization': `Bearer ${LZT_TOKEN}` }
+      })
+      if (downloadRes.ok) {
+        const downloadData = await downloadRes.json().catch(() => null)
+        downloadUrl = downloadData?.url || null
       }
+    } catch {
+      console.error('Download URL fetch failed')
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, downloadUrl })
 
   } catch (err) {
     console.error(err)

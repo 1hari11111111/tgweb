@@ -128,11 +128,14 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, itemId: account.item_id })
+        body: JSON.stringify({ itemId: account.item_id })
       })
       const data = await res.json()
       if (res.ok) {
         setPurchaseSuccess(true)
+        if (data.downloadUrl) {
+          window.open(data.downloadUrl, '_blank')
+        }
         refreshUser()
       } else {
         alert(data.error || 'Purchase failed')
@@ -298,7 +301,7 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
             </p>
             {purchaseSuccess ? (
               <div style={{ padding: '16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', color: '#22c55e', fontWeight: 600 }}>
-                Purchase Successful! The session file has been sent to you via Telegram bot.
+                ✅ Purchase Successful! Your account file has been downloaded. Check your downloads folder.
               </div>
             ) : showConfirm ? (
               <div style={{ padding: '16px', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: '12px', textAlign: 'left' }}>
@@ -343,12 +346,12 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
             )}
 
             {!user && (
-              <p style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '12px' }}>
-                Open this site inside Telegram to purchase.
+              <p style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '12px', textAlign: 'center' }}>
+                Please login to purchase this account.
               </p>
             )}
             {(user && user.balance < account.price * inrExchangeRate && !purchaseSuccess) && (
-              <p style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '12px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '12px', textAlign: 'center' }}>
                 Insufficient balance. Please deposit to your wallet.
               </p>
             )}
