@@ -1,7 +1,8 @@
 const TelegramBot = require('node-telegram-bot-api')
+const BotConstructor = TelegramBot.default || TelegramBot
 
 const token = process.env.TELEGRAM_BOT_TOKEN || ''
-export const bot = token ? new TelegramBot(token, { polling: false }) : null
+export const bot = token ? new BotConstructor(token, { polling: false }) : null
 
 export async function sendTelegramMessage(chatId: string | number, text: string) {
   if (!bot) {

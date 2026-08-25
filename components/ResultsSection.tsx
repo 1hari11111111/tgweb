@@ -14,6 +14,7 @@ interface SearchResult {
   hasNextPage: boolean
   perPage: number
   page: number
+  inrExchangeRate?: number
 }
 
 interface Props {
@@ -342,13 +343,13 @@ export default function ResultsSection({
         transition: 'opacity 200ms ease' 
       }}>
         {results.items.map(account => (
-          <AccountCard key={account.item_id} account={account} onClick={() => setSelectedAccount(account)} inrExchangeRate={results.inrExchangeRate} />
+          <AccountCard key={account.item_id} account={account} onClick={() => setSelectedAccount(account)} inrExchangeRate={results.inrExchangeRate || 84} />
         ))}
       </div>
 
       <Pagination currentPage={currentPage} totalItems={results.totalItems} perPage={results.perPage} hasNextPage={results.hasNextPage} onPageChange={onPageChange} />
 
-      {selectedAccount && <AccountModal account={selectedAccount} onClose={() => setSelectedAccount(null)} inrExchangeRate={results.inrExchangeRate} />}
+      {selectedAccount && <AccountModal account={selectedAccount} onClose={() => setSelectedAccount(null)} inrExchangeRate={results.inrExchangeRate || 84} />}
     </div>
   )
 }

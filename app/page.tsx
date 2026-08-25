@@ -14,6 +14,7 @@ interface SearchResult {
   hasNextPage: boolean
   perPage: number
   page: number
+  inrExchangeRate?: number
 }
 
 export default function HomePage() {
