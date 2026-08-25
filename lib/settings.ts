@@ -6,6 +6,7 @@ export interface SettingsData {
   inrExchangeRate: number
   upiId: string
   adminChatId: string
+  mainChannelId: string
 }
 
 const DEFAULT_SETTINGS: SettingsData = {
@@ -14,6 +15,7 @@ const DEFAULT_SETTINGS: SettingsData = {
   inrExchangeRate: 84,
   upiId: '',
   adminChatId: '',
+  mainChannelId: '',
 }
 
 // In-memory cache to prevent excessive DB queries on every request
@@ -39,6 +41,7 @@ export async function getSettings(): Promise<SettingsData> {
       inrExchangeRate: settingsMap['inrExchangeRate'] ? Number(settingsMap['inrExchangeRate']) : DEFAULT_SETTINGS.inrExchangeRate,
       upiId: settingsMap['upiId'] || DEFAULT_SETTINGS.upiId,
       adminChatId: settingsMap['adminChatId'] || DEFAULT_SETTINGS.adminChatId,
+      mainChannelId: settingsMap['mainChannelId'] || DEFAULT_SETTINGS.mainChannelId,
     }
     lastFetch = Date.now()
     return settingsCache

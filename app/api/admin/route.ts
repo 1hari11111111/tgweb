@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     inrExchangeRate: settings.inrExchangeRate,
     upiId: settings.upiId,
     adminChatId: settings.adminChatId,
+    mainChannelId: settings.mainChannelId,
     hasToken: !!settings.lztApiToken,
   })
 }
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   // Verify auth
   const body = await request.json()
-  const { password, lztApiToken, profitPercent, inrExchangeRate, upiId, adminChatId } = body
+  const { password, lztApiToken, profitPercent, inrExchangeRate, upiId, adminChatId, mainChannelId } = body
 
   if (password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -60,6 +61,10 @@ export async function POST(request: NextRequest) {
     updates.adminChatId = String(adminChatId)
   }
 
+  if (mainChannelId !== undefined) {
+    updates.mainChannelId = String(mainChannelId)
+  }
+
   const updated = await updateSettings(updates)
 
   return NextResponse.json({
@@ -69,6 +74,7 @@ export async function POST(request: NextRequest) {
     inrExchangeRate: updated.inrExchangeRate,
     upiId: updated.upiId,
     adminChatId: updated.adminChatId,
+    mainChannelId: updated.mainChannelId,
     hasToken: !!updated.lztApiToken,
   })
 }

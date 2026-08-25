@@ -5,6 +5,7 @@ import FilterPanel, { FilterValues } from '@/components/FilterPanel'
 import ResultsSection from '@/components/ResultsSection'
 import WalletModal from '@/components/WalletModal'
 import LoginModal from '@/components/LoginModal'
+import Sidebar from '@/components/Sidebar'
 import { useTma } from '@/components/TmaProvider'
 import { useAuth } from '@/components/TmaProvider'
 import { TelegramAccount } from '@/lib/lzt'
@@ -30,10 +31,15 @@ export default function HomePage() {
   const [showWallet, setShowWallet] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
+  const [settings, setSettings] = useState<any>(null)
   const { user } = useTma()
   const { logout } = useAuth()
   const abortRef = useRef<AbortController | null>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(setSettings).catch(() => {})
+  }, [])
 
   const buildQueryString = useCallback((f: FilterValues, page: number, sort: string) => {
     const params = new URLSearchParams()
@@ -148,72 +154,13 @@ export default function HomePage() {
 
       {/* ── Sidebar (Drawer) ── */}
       {showSidebar && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={() => setShowSidebar(false)} />
-          <div style={{ position: 'relative', width: '280px', height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', animation: 'slideLeft 0.2s ease-out' }}>
-            {/* User Header */}
-            <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: user ? 'var(--accent)' : 'var(--text-muted)' }}>
-                  <User size={20} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '15px' }}>{user?.username || 'Guest'}</div>
-                  {user ? (
-                    <div style={{ fontSize: '12px', color: 'var(--accent)' }}>₹ {user.balance.toFixed(2)} balance</div>
-                  ) : (
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Not logged in</div>
-                  )}
-                </div>
-              </div>
-              <button onClick={() => setShowSidebar(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-
-            {/* Nav Links */}
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px', flexGrow: 1 }}>
-              <a href="https://t.me/your_support_bot" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500 }}>
-                <MessageCircle size={18} color="var(--accent)" /> Support Chat
-              </a>
-              <a href="https://t.me/your_main_channel" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 500 }}>
-                <Megaphone size={18} color="#eab308" /> Main Channel
-              </a>
-            </div>
-
-            {/* Bottom actions */}
-            <div style={{ padding: '20px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {user ? (
-                <>
-                  {user.role === 'ADMIN' && (
-                    <a href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', textDecoration: 'none', color: '#ef4444', fontSize: '14px', fontWeight: 600 }}>
-                      <ShieldAlert size={18} /> Admin Panel
-                    </a>
-                  )}
-                  <a href="/profile" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600 }}>
-                    <User size={18} /> My Profile
-                  </a>
-                  <button
-                    onClick={async () => { await logout(); setShowSidebar(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', width: '100%' }}
-                  >
-                    <LogOut size={18} /> Logout
-                  </button>
-                </>
-              ) : (
-                <>
-                  <a href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', textDecoration: 'none', color: '#ef4444', fontSize: '14px', fontWeight: 600 }}>
-                    <ShieldAlert size={18} /> Admin Panel
-                  </a>
-                  <button
-                    onClick={() => { setShowSidebar(false); setShowLogin(true) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer', width: '100%' }}
-                  >
-                    <LogIn size={18} /> Login / Register
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <Sidebar 
+          user={user} 
+          onClose={() => setShowSidebar(false)} 
+          onLogin={() => { setShowSidebar(false); setShowLogin(true) }} 
+          onLogout={logout}
+          settings={settings}
+        />
       )}
 
       {/* ── Body ── */}
