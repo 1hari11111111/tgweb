@@ -86,21 +86,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errorMessage }, { status: 400 })
     }
 
-    // 5. Try to get download URL for the account file
-    let downloadUrl: string | null = null
+    // 5. After purchase, fetch item details (now includes login data since we own it)
+    let loginData: any = null
     try {
-      const downloadRes = await fetch(`${process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market'}/${itemId}/download`, {
-        headers: { 'Authorization': `Bearer ${LZT_TOKEN}` }
-      })
-      if (downloadRes.ok) {
-        const downloadData = await downloadRes.json().catch(() => null)
-        downloadUrl = downloadData?.url || null
+      const buyData = await buyRes.json().catch(() => null)
+      // The fast-buy response itself may contain the item
+      if (buyData?.item) {
+        loginData = {
+          phoneNumber: buyData.item.telegramLoginData?.phone_number || buyData.item.telegram_phone_number || null,
+          authKey: buyData.item.telegramLoginData?.auth_key || null,
+          dcId: buyData.item.telegramLoginData?.dc_id || null,
+          userId: buyData.item.telegramLoginData?.user_id || buyData.item.telegram_item_id || null,
+        }
       }
-    } catch {
-      console.error('Download URL fetch failed')
+      
+      // If fast-buy didn't return login data, try fetching item details
+      if (!loginData?.phoneNumber) {
+        const itemRes = await fetch(`${process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market'}/${itemId}`, {
+          headers: { 'Authorization': `Bearer ${LZT_TOKEN}`, 'Accept': 'application/json' }
+        })
+        if (itemRes.ok) {
+          const itemData = await itemRes.json()
+          if (itemData?.item) {
+            loginData = {
+              phoneNumber: itemData.item.telegramLoginData?.phone_number || itemData.item.telegram_phone_number || null,
+              authKey: itemData.item.telegramLoginData?.auth_key || null,
+              dcId: itemData.item.telegramLoginData?.dc_id || null,
+              userId: itemData.item.telegramLoginData?.user_id || itemData.item.telegram_item_id || null,
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch login data:', e)
     }
 
-    return NextResponse.json({ success: true, downloadUrl })
+    return NextResponse.json({ 
+      success: true, 
+      itemId,
+      loginData,
+    })
 
   } catch (err) {
     console.error(err)
