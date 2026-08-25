@@ -149,7 +149,7 @@ export default function AccountCheckoutPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
             <Row label="Price">{formatPrice(account.price, inrRate)}</Row>
             <Row label="Premium"><YesNo value={account.telegram_premium === 1} /></Row>
-            <Row label="Spam Block"><YesNo value={account.telegram_spam_block !== 'no'} danger /></Row>
+            <Row label="Spam Block"><YesNo value={account.telegram_spam_block !== null && Number(account.telegram_spam_block) !== -1} danger /></Row>
             <Row label="2FA Password"><YesNo value={account.telegram_password === 1} /></Row>
             <Row label="Last Seen">{formatDate(account.telegram_last_seen)}</Row>
             <Row label="Contacts">{account.telegram_contacts_count ?? 0}</Row>
@@ -201,7 +201,7 @@ export default function AccountCheckoutPage() {
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '20px' }}>
                 <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Total Price</span>
-                <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--accent)' }}>₹ {costInr.toFixed(2)}</span>
+                <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--accent)' }}>{formatPrice(account.price, inrRate)}</span>
               </div>
 
               {purchaseError && (
