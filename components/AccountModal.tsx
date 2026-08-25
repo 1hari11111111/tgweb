@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { TelegramAccount } from '@/lib/lzt'
 import { getCountryName, getCountryFlagUrl } from '@/lib/countries'
-import { X, ExternalLink, Loader2, ShoppingCart } from 'lucide-react'
+import { X, ExternalLink, ShoppingCart } from 'lucide-react'
 
 import { useTma } from './TmaProvider'
 
@@ -99,53 +99,11 @@ function SectionBox({ title, children }: { title: string; children: React.ReactN
 }
 
 export default function AccountModal({ account, onClose, inrExchangeRate }: Props) {
-  const { user, initData, refreshUser } = useTma()
-  const [purchasing, setPurchasing] = useState(false)
-  const [purchaseSuccess, setPurchaseSuccess] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
+  const { user } = useTma()
 
   const countryName = getCountryName(account.telegram_country)
   const flagUrl = getCountryFlagUrl(account.telegram_country)
   const isPremium = account.telegram_premium === 1
-
-  const handlePurchase = async () => {
-    if (!user) {
-      alert('Please connect via Telegram Web App to purchase.')
-      return
-    }
-
-    if (user.balance < account.price * inrExchangeRate) {
-      alert('Insufficient INR balance in your wallet. Please deposit first.')
-      return
-    }
-
-    setShowConfirm(true)
-  }
-
-  const confirmPurchase = async () => {
-    setPurchasing(true)
-    try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: account.item_id })
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setPurchaseSuccess(true)
-        if (data.downloadUrl) {
-          window.open(data.downloadUrl, '_blank')
-        }
-        refreshUser()
-      } else {
-        alert(data.error || 'Purchase failed')
-      }
-    } catch (err) {
-      alert('Network error')
-    } finally {
-      setPurchasing(false)
-    }
-  }
   const hasPassword = account.telegram_password === 1
   const hasEmail = (account as any).telegram_email === 1
   const spam = isSpammed(account.telegram_spam_block)
@@ -299,10 +257,6 @@ export default function AccountModal({ account, onClose, inrExchangeRate }: Prop
             <p style={{ fontSize: '24px', fontWeight: 800, color: 'var(--accent)', marginBottom: '16px' }}>
               {formatPrice(account.price, inrExchangeRate)}
             </p>
-            {purchaseSuccess ? (
-              <div style={{ padding: '16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', color: '#22c55e', fontWeight: 600 }}>
-                ✅ Purchase Successful! Your account file has been downloaded. Check your downloads folder.
-              </div>
             {user && (
               <button
                 onClick={() => window.open(`/account/${account.item_id}`, '_blank')}
